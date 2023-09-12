@@ -1,0 +1,239 @@
+; XTRA
+; Embedded .xtra Header
+; 
+; General Info
+; -------------------------------------------------------
+; ExePath         = "ram:"
+; ExeFile         = "Empty"
+; CreateIcon      = 0
+; Residents       = "all.res"
+; 
+; Compiler
+; -------------------------------------------------------
+; StringBuffer    = 100000
+; MakeSmallest    = 1
+; FuncOptimize    = 1
+; Version         = 0.0.0
+; NumberOfBuilds  = 78
+; 
+; Debugger
+; -------------------------------------------------------
+; CliArgs         = ""
+; StackSize       = 8192
+; RuntimeDebug    = 0
+; DebugInfo       = 0
+; CreateDbgFile   = 0
+; OverflowCheck   = 0
+; AssemblerCheck  = 0
+; InterruptCheck  = 1
+; AutoRun         = 1
+; 
+; Editor
+; -------------------------------------------------------
+; CursorLine      = 153
+; CursorColumn    = 5
+; LabelSearch     = ""
+; LabelRemark     = 0
+; LabelAll        = 0
+; LabelPosition   = 0
+; 
+; Blitz Objects
+; -------------------------------------------------------
+; Max File        = 100
+; Max GadgetList  = 100
+; Max Shape       = 200
+; Max Bank        = 1
+; Max MenuList    = 100
+; Max GTList      = 100
+; Max Palette     = 4
+; Max BitMap      = 10
+; Max Screen      = 5
+; Max IntuiFont   = 10
+; Max BlitzFont   = 1
+; Max Window      = 100
+; Max IconInfo    = 1
+; Max MUIObject   = 50
+; Max AsyncReq    = 4
+; Max Req-Lib     = 5
+; Max GTMenuList  = 100
+; Max Console     = 5
+; Max TCPSock     = 5
+; Max Tape        = 5
+; Max Sound       = 10
+; Max MedModule   = 8
+; Max Buffer      = 10
+; Max Queue       = 10
+; Max Sprite      = 20
+; Max Module      = 5
+; Max Slice       = 10
+; Max Page        = 4
+; Max CopList     = 10
+; Max PTModule    = 5
+; Max Anim        = 10
+; Max NChunky     = 50
+; Max Chunky      = 20
+; Max Stencil     = 5
+; Max XBSound     = 10
+; /XTRA
+
+; MINI GAME TUTORIAL v0.1  - 2023
+; Fabrizio Radica
+
+;Needs for WB applications
+WBStartup
+
+;Game Variables
+speed=2
+xoffset=120
+yoffset=100
+
+#bplanes = 4
+#screenw = 320
+#screenh = 256
+#MAXBULLETS = 5
+
+
+; ****************************************
+;Structs
+
+;Player struct
+NEWTYPE .player
+  x.w
+  y.w
+  speed.w
+  active.w
+  gun.w
+End NEWTYPE
+DEFTYPE .player player
+
+;Bullet struct
+NEWTYPE .bullet
+  x.w
+  y.w
+  speed.w
+  active.w
+  v.b
+  xdir.w
+  ydir.w
+  frame.w
+End NEWTYPE
+
+;Functions
+Dim List bullet.bullet(#MAXBULLETS)
+While AddLast(bullet())
+    bullet()\active=False
+    bullet()\speed=8
+    bullet()\v=0
+    bullet()\xdir=0
+    bullet()\ydir=1
+    bullet()\frame=2
+Wend
+
+Function StartBullet{#MAXBULLETS,frame,offset,xdir,ydir}
+SHARED bullet(),player,bc
+       bullet(bc)\v=0
+       bullet(bc)\xdir=xdir
+       bullet(bc)\ydir=ydir
+       bullet(bc)\active=True
+       bullet(bc)\x=player\x+offset
+       bullet(bc)\y=player\y
+       bullet(bc)\frame=frame
+       bc=QWrap(bc+1,0,#MAXBULLETS-1)
+End Function
+
+Function MoveBullet{}
+SHARED bullet(),db
+
+End Function
+
+; **************************************************************
+;Open Screen
+BitMap 0,#screenw,#screenh,#bplanes
+
+;load bitmap
+LoadBitMap 0,"PCAmiga:LavoriBlitz/Lessons/assets/sprites.iff",0
+
+GetaShape 0,1,1,20,24
+GetaShape 1,22,1,32,32
+GetaShape 2,56,1,12,16
+GetaShape 3,66,1,8,12
+GetaShape 4,75,1,2,10
+Cls
+
+;make a simple tile background
+For x=0 To 9
+For y=0 To 7
+  Blit 1,x*32,y*32
+  Next
+Next
+
+;Open a second screen for double buffering
+BitMap 1,#screenw,#screenh,#bplanes
+CopyBitMap 0,1
+InitCopList 0,44,#screenh,$04,8,#bplanes,0
+
+DisplayBitMap 0,0
+PalRGB 0,0,0,0,0
+DisplayPalette 0,0
+
+;Enter Blitz Mode
+BLITZ
+Buffer 0, 3*16384:Buffer 1, 3*16384
+CreateDisplay 0
+
+
+;******************************************* MAIN GAME ********************
+.Update ;update every frame
+While RawStatus($45)=0 AND RawStatus($10)=0
+
+    ResetList bullet()
+
+    ;Double buffer
+    VWait
+    DisplayBitMap 0,db:db=1-db:Use BitMap db
+    UnBuffer db
+    ;End double buffer
+
+    xj+Joyx(1)*speed  ;it's the same of xj=xj+joyx(1)*speed
+    yj+Joyy(1)*speed
+
+    player\x=xoffset+xj
+    player\y=yoffset+yj
+
+    ;Press Fire
+    If Joyb(1)=1 AND press=0
+         StartBullet{#MAXBULLETS-1,4,9,0,1}
+    EndIf
+    press=Joyb(1)
+
+    ;Move bullets
+            While NextItem (bullet())
+            USEPATH bullet()
+              If \active
+                If \y>\speed
+                  \y-\speed*\ydir
+                  \v+\xdir
+                Else
+                  \active=False
+                EndIf
+                If \x<16 OR \x>#screenw-8 OR \y>#screenh-8
+                  \active=False
+                Else
+                  BBlit db,\frame,\x+\v,\y
+                EndIf
+              EndIf
+            Wend
+    ;end Move Bullets
+
+    ;player
+    BBlit db,0,player\x,player\y
+
+    ;shadow
+    BBlit db,3,player\x+22,player\y+22
+
+
+Wend
+
+
+.EndProgram
+End
